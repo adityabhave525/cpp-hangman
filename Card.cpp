@@ -4,6 +4,12 @@
 #include <algorithm>
 #include "Random.h"
 
+namespace Settings
+{
+    constexpr int bust{ 21 };
+    constexpr int dealerStopsAt{ 17 };
+};
+
 struct Card
 {
     enum Rank
@@ -91,13 +97,146 @@ public:
     }
 };
 
-int main()
+class Player
+{
+private:
+    int m_score{};
+    int m_ace11Count{ 0 };
+
+public:
+
+    void addToScore(Card card)
+    {
+        m_score += card.value();
+        if (card.rank == Card::rank_ace)
+        {
+            ++m_ace11Count;
+        }
+        consumeAces();
+    }
+
+    void consumeAces()
+    {
+        while (m_score > Settings::bust && m_ace11Count > 0)
+        {
+            m_score -= 10;
+            --m_ace11Count;
+        }
+    }
+
+    int score()
+    {
+        return m_score;
+    }
+};
+
+bool playerWantsHit()
+{
+    while (true)
+    {
+        std::cout << "(h) to hit, or (s) to stand: ";
+
+        char ch{};
+        std::cin >> ch;
+
+        switch (ch)
+        {
+        case 'h':
+            return true;
+        case 's':
+            return false;
+        }
+    }
+}
+
+bool playerTurn(Deck& deck, Player& player)
+{
+    while (player.score() < Settings::bust && playerWantsHit())
+    {
+        Card card{ deck.dealCard() };
+        player.addToScore(card);
+
+        std::cout << "You were dealt " << card << ". You now have: " << player.score() << '\n';
+
+    }
+
+    if (player.score() > Settings::bust)
+    {
+        std::cout << "You went bust!\n";
+        return true;
+    }
+
+    return false;
+}
+
+bool dealerTurn(Deck& deck, Player& dealer)
+{
+    while (dealer.score() < Settings::dealerStopsAt)
+    {
+        Card card{ deck.dealCard() };
+        dealer.addToScore(card);
+        std::cout << "The dealer flips a " << card << ".  They now have: " << dealer.score() << '\n';
+    }
+
+    if (dealer.score() > Settings::bust)
+    {
+        std::cout << "The dealer went bust!\n";
+        return true;
+    }
+
+    return false;
+}
+
+enum class GameResult
+{
+    playerWon,
+    dealerWon,
+    tie
+};
+
+GameResult playBlackjack()
 {
     Deck deck{};
-    std::cout << deck.dealCard() << ' ' << deck.dealCard() << ' ' << deck.dealCard() << '\n';
-
     deck.shuffle();
-    std::cout << deck.dealCard() << ' ' << deck.dealCard() << ' ' << deck.dealCard() << '\n';
+
+    Player dealer{};
+    Card card1{ deck.dealCard() };
+    dealer.addToScore(card1);
+    std::cout << "The dealer is showing " << card1 << " (" << dealer.score() << ")\n";
+
+    Player player{};
+    Card card2{ deck.dealCard() };
+    Card card3{ deck.dealCard() };
+    player.addToScore(card2);
+    player.addToScore(card3);
+    std::cout << "You are showing " << card2 << ' ' << card3 << " (" << player.score() << ")\n";
+
+    if (playerTurn(deck, player)) // if player busted
+        return GameResult::dealerWon;
+
+    if (dealerTurn(deck, dealer)) // if dealer busted
+        return GameResult::playerWon;
+
+    if (player.score() == dealer.score())
+        return GameResult::tie;
+
+    return (player.score() > dealer.score() ? GameResult::playerWon : GameResult::dealerWon);
+}
+
+int main()
+{
+    switch (playBlackjack())
+    {
+    case GameResult::playerWon:
+        std::cout << "You win!\n";
+        return 0;
+    case GameResult::dealerWon:
+        std::cout << "You lose!\n";
+        return 0;
+    case GameResult::tie:
+        std::cout << "It's a tie.\n";
+        return 0;
+    }
 
     return 0;
 }
